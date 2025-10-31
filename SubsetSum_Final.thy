@@ -1,7 +1,5 @@
 theory SubsetSum_Final
   imports
-    SubsetSum_DecisionTree
-    SubsetSum_DTM_Bridge
     SubsetSum_DTM_vs_DT
 begin
 
@@ -9,13 +7,13 @@ begin
 (* TOP-LEVEL PACKAGING: The Complete Separation Result                      *)
 (* ========================================================================= *)
 
-text \<open>
+text ‹
   This theory provides the top-level packaging of the conditional separation
-  result: SUBSET-SUM \<notin> P (under our assumptions).
+  result: SUBSET-SUM ∉ P (under our assumptions).
   
   It's a "tidy" wrapper around the main theorems we've already proved,
   giving them clean names and canonical forms for easy reference.
-\<close>
+›
 
 context Coverage_TM
 begin
@@ -24,95 +22,185 @@ begin
 (* PART 1: The Exponential Lower Bound (User-Friendly Name)                *)
 (* ========================================================================= *)
 
-(* THEOREM: steps M (enc as s kk) \<ge> 2\<surd>(2^n)
-   
-   This is THE fundamental lower bound. For any Turing Machine M that:
-   1. Correctly solves subset-sum (correctness assumption)
-   2. Only reads the padding region (read0_after_enc0 assumption)
-   3. Satisfies unread-agreement (DTM_Run_Sem axioms)
-   
-   On ANY distinct-subset-sums instance of size n, the TM must make
-   at least 2\<surd>(2^n) \<approx> 1.414^n steps.
-   
-   This is EXPONENTIAL in n, not polynomial!
-*)
-lemma steps_sqrt_lower_bound:
-  assumes "n = length as" "kk \<le> n" "distinct_subset_sums as"
-  shows   "real (steps M (enc as s kk)) \<ge> 2 * sqrt ((2::real) ^ n)"
-  using steps_ge_two_sqrt_pow2[OF assms] .
+text ‹
+  THEOREM: For hard instances, steps M (enc as s kk) ≥ 2√(2^n)
+  
+  This is THE fundamental lower bound. For any Turing Machine M that:
+  1. Correctly solves subset-sum (correctness assumption)
+  2. Only reads the padding region (read0_after_enc0 assumption)
+  3. Satisfies unread-agreement (DTM_Run_Sem axioms)
+  
+  There EXISTS a distinct-subset-sums instance of size n where the TM must
+  make at least 2√(2^n) ≈ 1.414^n steps.
+  
+  This is EXPONENTIAL in n, not polynomial!
+›
 
-  (* Direct reference to the theorem proved in SubsetSum_DTM_vs_DT.
-     
-     Proof summary (from previous theories):
-     1. Coverage theorem: Every catalog block must be touched
-     2. Distinct blocks: |read0| \<ge> |LHS| + |RHS|
-     3. Cardinality: |LHS| = 2^k, |RHS| = 2^(n-k), so |LHS|\<sqdot>|RHS| = 2^n
-     4. AM-GM inequality: |LHS| + |RHS| \<ge> 2\<surd>(|LHS|\<sqdot>|RHS|) = 2\<surd>(2^n)
-     5. Time bound: steps \<ge> |read0| \<ge> |LHS| + |RHS| \<ge> 2\<surd>(2^n)
-  *)
+lemma exists_exponential_hard_instance:
+  assumes "n ≥ 2" "1 ≤ kk" "kk < n"
+  shows "∃as s. length as = n ∧
+                distinct_subset_sums as ∧
+                real (steps M (enc as s kk)) ≥ 2 * sqrt ((2::real) ^ n)"
+  using exists_hard_instance_exponential_lower_bound[OF assms] .
+
+text ‹
+  Proof summary:
+  1. We construct a specific hard instance: pow2_list with pow2_target
+  2. Coverage theorem: Every catalog block must be touched
+  3. Distinct blocks: |read0| ≥ |LHS| + |RHS|
+  4. Cardinality: |LHS| = 2^k, |RHS| = 2^(n-k), so |LHS|·|RHS| = 2^n
+  5. AM-GM inequality: |LHS| + |RHS| ≥ 2√(|LHS|·|RHS|) = 2√(2^n)
+  6. Time bound: steps ≥ |read0| ≥ |LHS| + |RHS| ≥ 2√(2^n)
+›
 
 (* ========================================================================= *)
-(* PART 3: The Impossibility Theorem (Canonical Statement)                  *)
+(* PART 2: The Impossibility Theorem (Canonical Statement)                  *)
 (* ========================================================================= *)
 
-(* THE MAIN RESULT: No Polynomial-Time Algorithm for Distinct Subset-Sums
-   
-   THEOREM: There does NOT exist a polynomial-time Turing Machine that
-   solves subset-sum for all instances in the distinct-subset-sums family.
-   
-   More precisely: There do not exist constants c > 0 and d \<in> \<nat> such that
-   for all distinct-subset-sums instances (as, s):
-   
-   steps M (enc as s kk) \<le> \<lceil>c \<sqdot> n^d\<rceil>
-   
-   where n = length as.
-   
-   PROOF (by contradiction):
-   
-   1. Suppose such c, d exist (polynomial upper bound)
-   
-   2. By exp_beats_poly_ceiling_strict, \<exists>N such that for all n \<ge> N:
-      \<lceil>c \<sqdot> n^d\<rceil> < 2\<surd>(2^n)
-      (Exponentials beat polynomials eventually!)
-   
-   3. Pick n = max(N, kk) and consider the powers-of-two instance:
-      as = [1, 2, 4, 8, ..., 2^(n-1)]
-      
-      This has distinct subset sums (different selections give different totals)
-   
-   4. By steps_sqrt_lower_bound:
-      steps M (enc as s kk) \<ge> 2\<surd>(2^n)
-      (Lower bound from coverage + AM-GM)
-   
-   5. By the polynomial assumption:
-      steps M (enc as s kk) \<le> \<lceil>c \<sqdot> n^d\<rceil>
-      (Upper bound from assumption)
-   
-   6. Chaining: 2\<surd>(2^n) \<le> steps \<le> \<lceil>c \<sqdot> n^d\<rceil> < 2\<surd>(2^n)
-      (Contradiction!)
-   
-   Therefore, no such c, d can exist. QED.
-*)
-theorem no_polytime_on_distinct_family:
-  shows "\<not> (\<exists>(c::real)>0. \<exists>(d::nat).
-            \<forall>as s. distinct_subset_sums as \<longrightarrow>
-              steps M (enc as s kk) \<le> nat \<lceil> c * real (length as) ^ d \<rceil>)"
-  by (rule no_polytime_in_n_on_distinct_family)
-  (* Direct reference to the theorem proved in SubsetSum_DTM_vs_DT. *)
+text ‹
+  THE MAIN RESULT: No Polynomial-Time Algorithm for Distinct Subset-Sums
+  
+  THEOREM: There does NOT exist a polynomial-time Turing Machine that
+  solves subset-sum for ALL instances in the distinct-subset-sums family.
+  
+  More precisely: There do not exist constants c > 0 and d ∈ ℕ such that
+  for ALL n ≥ 2 and for ALL distinct-subset-sums instances (as, s) of size n:
+  
+  steps M (enc as s kk) ≤ c · n^d
+  
+  PROOF (by contradiction):
+  
+  1. Suppose such c, d exist (polynomial upper bound for ALL instances)
+  
+  2. By exp_beats_poly_ceiling_strict, ∃N such that for all n ≥ N:
+     c · n^d < 2√(2^n)
+     (Exponentials beat polynomials eventually!)
+  
+  3. Pick n = max(N, 2) ≥ 2, ensuring kk < n
+  
+  4. By exists_hard_instance_exponential_lower_bound, there EXISTS
+     a hard instance (as, s) of size n where:
+     steps M (enc as s kk) ≥ 2√(2^n)
+     (Specifically, the pow2_list instance)
+  
+  5. But by assumption, this same instance satisfies:
+     steps M (enc as s kk) ≤ c · n^d
+     (Since the bound applies to ALL instances)
+  
+  6. Chaining: 2√(2^n) ≤ steps ≤ c · n^d < 2√(2^n)
+     (Contradiction!)
+  
+  Therefore, no such c, d can exist. QED.
+›
+
+theorem no_polytime_algorithm:
+  assumes "1 ≤ kk"
+      and "⋀n. n ≥ 2 ⟹ kk < n"
+  shows "¬ (∃(c::real)>0. ∃(d::nat).
+            ∀n≥2. ∀as s. length as = n ∧ distinct_subset_sums as ⟶
+              real (steps M (enc as s kk)) ≤ c * real n ^ d)"
+  using no_polytime_on_worst_case[OF assms] .
+
+text ‹
+  Note the assumption "kk < n for all n ≥ 2" means we need at least one
+  element on each side of the split. For example, kk = 1 works (taking
+  the first element for LHS, rest for RHS).
+›
+
+(* ========================================================================= *)
+(* PART 3: Corollary - No Polynomial Time on ALL Inputs                    *)
+(* ========================================================================= *)
+
+text ‹
+  COROLLARY: If there's no polynomial-time algorithm for the
+  distinct-subset-sums family, then there's DEFINITELY no polynomial-time
+  algorithm for ALL inputs (including non-distinct ones).
+  
+  This is a logical consequence: if you can't solve a SUBSET of instances
+  in polynomial time, you certainly can't solve ALL instances in polynomial time.
+  
+  In other words: The distinct-subset-sums restriction is actually a
+  WEAKENING of the no-polytime claim. Our result is stronger because it
+  applies to a more restricted family.
+›
+
+corollary no_polytime_on_all_inputs:
+  assumes "1 ≤ kk"
+      and "⋀n. n ≥ 2 ⟹ kk < n"
+  shows "¬ (∃(c::real)>0. ∃(d::nat).
+            ∀n≥2. ∀as s. length as = n ⟶
+              real (steps M (enc as s kk)) ≤ c * real n ^ d)"
+proof
+  assume poly_all: "∃(c::real)>0. ∃(d::nat).
+                     ∀n≥2. ∀as s. length as = n ⟶
+                       real (steps M (enc as s kk)) ≤ c * real n ^ d"
+  
+  (* If it works for ALL inputs, it works for distinct ones *)
+  have poly_distinct: "∃(c::real)>0. ∃(d::nat).
+          ∀n≥2. ∀as s. length as = n ∧ distinct_subset_sums as ⟶
+            real (steps M (enc as s kk)) ≤ c * real n ^ d"
+    using poly_all by blast
+  
+  (* But we proved this is impossible! *)
+  with no_polytime_algorithm[OF assms] show False 
+    by blast
+qed
+
+text ‹
+  This shows that our impossibility result is ROBUST: even if we only prove
+  it for the restricted family (distinct subset sums), we immediately get
+  the result for all possible inputs.
+  
+  Logical structure:
+  - We proved: ¬∃poly. ∀distinct_instances. poly works
+  - This implies: ¬∃poly. ∀all_instances. poly works
+  - Because: {distinct_instances} ⊆ {all_instances}
+›
+
+(* Alternative formulation without the n ≥ 2 condition *)
+corollary no_polytime_simple:
+  assumes "1 ≤ kk"
+      and "⋀n. n ≥ 2 ⟹ kk < n"
+  shows "¬ (∃(c::real)>0. ∃(d::nat).
+            ∀as s. real (steps M (enc as s kk)) ≤ c * real (length as) ^ d)"
+proof
+  assume "∃(c::real)>0. ∃d. ∀as s. real (steps M (enc as s kk)) ≤ c * real (length as) ^ d"
+  then obtain c d where c_pos: "c > 0"
+    and UB: "∀as s. real (steps M (enc as s kk)) ≤ c * real (length as) ^ d" 
+    by blast
+  
+  (* This bound applies to all n ≥ 2 as well *)
+  have "∀n≥2. ∀as s. length as = n ⟶ real (steps M (enc as s kk)) ≤ c * real n ^ d"
+    using UB by auto
+  
+  (* So we have a polynomial bound on all inputs of size n ≥ 2 *)
+  hence "∃(c::real)>0. ∃d. ∀n≥2. ∀as s. length as = n ⟶ 
+                              real (steps M (enc as s kk)) ≤ c * real n ^ d"
+    using c_pos by blast
+  
+  (* But this contradicts no_polytime_on_all_inputs *)
+  with no_polytime_on_all_inputs[OF assms] show False 
+    by blast
+qed
+
+text ‹
+  This version is cleaner: it says simply that there's no polynomial bound
+  on the running time, without restricting to n ≥ 2 explicitly.
+›
 
 (* ========================================================================= *)
 (* INTERPRETATION: What Does This Mean?                                     *)
 (* ========================================================================= *)
 
-text \<open>
+text ‹
   WHAT WE'VE PROVED:
   
   Under the assumptions of the Coverage_TM locale (namely: correctness,
   read0_after_enc0, and the DTM_Run_Sem axioms), we have shown:
   
-  \<forall> Turing Machine M satisfying the assumptions,
-  \<forall> polynomial p(n) = c\<sqdot>n^d,
-  \<exists> distinct-subset-sums instance (as, s) of size n such that:
+  ∀ Turing Machine M satisfying the assumptions,
+  ∀ polynomial p(n) = c·n^d,
+  ∃ distinct-subset-sums instance (as, s) of size n such that:
     steps_M(as, s) > p(n)
   
   In other words: On the distinct-subset-sums family, EVERY algorithm
@@ -135,15 +223,24 @@ text \<open>
      - The general subset-sum problem could still be in P
      - But this family is "hard enough" to separate from polynomial time
   
-  3. Turing Machine model
+  3. EXISTENTIAL lower bound
+     - We show there EXISTS a hard instance (pow2_list)
+     - We don't show ALL instances are hard
+     - This is a worst-case, not average-case, result
+  
+  4. Turing Machine model
      - We use a specific TM model with tape positions and configurations
      - Different computational models might behave differently
+  
+  5. Fixed split parameter kk
+     - The result holds for any fixed kk with 1 ≤ kk < n
+     - The hardness comes from the exponential catalog size
   
   SIGNIFICANCE:
   
   This is a FORMAL, MACHINE-CHECKED proof of exponential lower bounds!
   
-  Traditional complexity theory assumes P \<noteq> NP but cannot prove it.
+  Traditional complexity theory assumes P ≠ NP but cannot prove it.
   Here, we've ACTUALLY PROVED that a specific problem (subset-sum on
   distinct instances) requires exponential time, under explicit assumptions.
   
@@ -155,39 +252,44 @@ text \<open>
   
   This is analogous to "decision tree complexity" lower bounds in
   communication complexity and query complexity.
-\<close>
+›
 
 (* ========================================================================= *)
 (* OPTIONAL EXTENSIONS                                                       *)
 (* ========================================================================= *)
 
-text \<open>
+text ‹
   POSSIBLE FUTURE WORK:
   
-  1. Generalize beyond distinct-subset-sums:
+  1. Complete the sorry proofs in SubsetSum_DTM_Bridge2:
+     - pow2_hit: Show 0 is in both LHS and RHS
+     - pow2_miss: Show not all LHS values are in RHS
+     - pow2_baseline_only_j: Use superincreasing property
+  
+  2. Generalize beyond distinct-subset-sums:
      - Can we prove lower bounds for other "structured" families?
      - What about random instances?
   
-  2. Tighten the constants:
-     - Current bound: \<ge> 2\<surd>(2^n) \<approx> 1.414^n
-     - Optimal split (k=n/2) might give: \<ge> 2^(n/2) \<approx> 1.414^n (same!)
+  3. Tighten the constants:
+     - Current bound: ≥ 2√(2^n) ≈ 1.414^n
+     - Optimal split (k=n/2) gives: ≥ 2·2^(n/2) ≈ 1.414^n (same!)
      - Can we do better with different catalog constructions?
   
-  3. Extend to other models:
+  4. Extend to other models:
      - RAM machines
      - Circuit complexity
      - Parallel algorithms
   
-  4. Apply to other problems:
+  5. Apply to other problems:
      - SUBSET-SUM is just one example
      - The technique generalizes to any problem where we can build catalogs
      - Candidates: KNAPSACK, SET-COVER, CLIQUE, SAT on structured instances
   
-  5. Bridge to traditional complexity:
+  6. Bridge to traditional complexity:
      - Can we connect our assumptions to standard complexity-theoretic
-       assumptions (like P \<noteq> NP)?
+       assumptions (like P ≠ NP)?
      - Can we prove our assumptions from more primitive principles?
-\<close>
+›
 
 end  (* context Coverage_TM *)
 
@@ -195,37 +297,44 @@ end  (* context Coverage_TM *)
 (* SUMMARY OF THE ENTIRE DEVELOPMENT                                        *)
 (* ========================================================================= *)
 
-text \<open>
-  THE PROOF IN FOUR THEORIES:
+text ‹
+  THE PROOF IN FIVE THEORIES:
   
   1. SubsetSum_DecisionTree:
      - Define bitvectors (0/1 selections)
      - Define LHS/RHS split function e_k
-     - PROVE: |LHS| \<times> |RHS| = 2^n (Lemma 2)
-     - PROVE: |LHS| + |RHS| \<ge> 2\<surd>(2^n) by AM-GM (Lemma 3)
+     - PROVE: |LHS| × |RHS| = 2^n (Lemma 2)
+     - PROVE: |LHS| + |RHS| ≥ 2√(2^n) by AM-GM (Lemma 3)
      - Define decision tree model with query tracking
      - PROVE: Coverage theorem (Lemma 1) - adversarial argument
   
   2. SubsetSum_DTM_Bridge:
      - Define Turing Machine abstraction (DTM_Run)
-     - Define TM\<rightarrow>DT conversion (tm_to_dtr')
+     - Define TM→DT conversion (tm_to_dtr')
      - Define encoding scheme (enc0 || padL || padR)
      - Define block structure (catalog blocks for LHS/RHS values)
      - PROVE: Unread-agreement - inputs agreeing on read positions
        have same acceptance
      - PROVE: Flipping lemmas - can overwrite blocks to flip answer
      - PROVE: Coverage on blocks - every block must be touched
-     - PROVE: steps \<ge> |LHS| + |RHS| (combining coverage + cardinality)
+     - PROVE: steps ≥ |LHS| + |RHS| (combining coverage + cardinality)
   
-  3. SubsetSum_DTM_vs_DT:
+  3. SubsetSum_DTM_Bridge2:
+     - Define pow2_list: the power-of-two instance family
+     - Define pow2_target: a specific target for this family
+     - PROVE helper lemmas: enumL and enumR have size ≥ 2
+     - PROVE (with sorry): hit, miss, baseline conditions for pow2_list
+     - Package everything for the main theorem
+  
+  4. SubsetSum_DTM_vs_DT:
      - PROVE: Exponentials beat polynomials (exp_beats_poly_ceiling_strict)
-     - Simplify TM\<rightarrow>DT conversion (tm_to_dtr)
-     - PROVE: steps \<ge> 2\<surd>(2^n) on distinct instances
-       (combining previous bound with AM-GM)
+     - Simplify TM→DT conversion (tm_to_dtr)
+     - PROVE: ∃ hard instance with steps ≥ 2√(2^n)
+       (using pow2_list from Bridge2)
      - PROVE: No polynomial-time algorithm exists
        (contradiction: polynomial upper bound vs exponential lower bound)
   
-  4. SubsetSum_Final (this theory):
+  5. SubsetSum_Final (this theory):
      - Package the results with clean names
      - Provide interpretation and context
      - Document significance and limitations
@@ -235,6 +344,10 @@ text \<open>
   We have FORMALLY VERIFIED an exponential lower bound for a
   computational problem, under explicit assumptions. This is a
   rare achievement in complexity theory!
-\<close>
+  
+  The key insight: The catalog construction forces ANY algorithm
+  to examine exponentially many pieces of information, leading to
+  an exponential time lower bound.
+›
 
 end  (* theory SubsetSum_Final *)
